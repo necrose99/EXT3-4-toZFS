@@ -1,0 +1,102 @@
+https://github.com/Sabayon-Labs/spike-community-overlay
+
+https://www.youtube.com/watch?v=ls51esK7Izk
+
+http://www.addonics.com/products/ad4sahmsa.php
+dev-perl/App-cpanminus
+layman -f -a https://raw.githubusercontent.com/Sabayon-Labs/spike-community-overlay/master/overlays.xml
+
+
+Powerful, free-of-charge, open-source Linux operating system.Can you create a Linux file system without using partition DIRECTLY – sort of file system within file system management?
+
+The answer is certainly YES!
+
+With a loopback device in Linux (a feature that’s not natively available in Windows Vista and its predecessors) one can easily create a Linux loopback file system on a regular disk file, and not directly using a disk partition!
+
+How to create a Linux loopback file system with a regular disk file?
+To complete this Linux tricks, you need to login with a root user ID for all the steps given below
+
+    Type dd if=/dev/zero of=/virtualfs bs=1024 count=30720 to create a 30MB disk file (zero-filled) called virtualfs in the root (/) directory
+     
+    Type losetup /dev/loop0 to confirm that the current system is not using any loopback devices. Replace /dev/loop0 with /dev/loop1, /dev/loop2, etc, until a free Linux loopback device is found. In this case, let’s assume that /dev/loop0 is free for usage
+     
+    Tpye losetup /dev/loop0 /virtualfs to attach the first Linux loopback device (/dev/loop0) with regular disk file (/virtualfs) created in step 1
+     
+    Type echo $? to confirm the previous step is completed successfully without error – a zero will be returned to indicate success. Alternative, type losetup /dev/loop0 to confirm
+     
+    Type mkfs -t ext3 -m 1 -v /dev/loop0 to create a Linux EXT3 file system with 1% reserved block count on the loopback device that’s currently associated with a regular disk file. Hence, we are creating a file system within file system, or creating a file system (mkfs) without using a disk partition directly
+     
+    Type mkdir /mnt/vfs to create a directory (as mount point) in /mnt
+     
+    Type mount -t ext3 /dev/loop0 /mnt/vfs to mount the loopback device (regular disk file) to /mnt/vfs as a “regular” Linux EXT3 file system! Now, all the Linux file system-related commands can be act on this unusual Linux file system. For example, you can type df -h to confirm its “disk usage”, type tune2fs -l /dev/loop0 to print its file system settings, create / remove files or directories, etc.
+     
+    To un-mount the loopback file system, type umount /mnt/vfs follow with losetup -d /dev/loop0 to effectively remove the loopback file system and release loopback device subsequently.
+
+Introduction
+
+Using dd, one can easily backup the MBR and partition table of a disk. It's as easy as: dd if=/dev/disk2 of=~/Desktop/disk2_mbr bs=512 count=1
+
+One can also backup whole partitions: dd if=/dev/disk2s1 of=~/Desktop/disk2_partition1
+
+The other way around works too: with dd if=~/Desktop/disk2_mbr of=/dev/disk3, one can replace another disk MBR and partition table (beware, data loss on disk3).
+
+Then, to restore the first partition, one does: dd if=~/Desktop/disk2_partition1 of=/dev/disk3s1
+
+(The point of dding separately the MBR and the partition is that you don't need to dd the whole disk; if your partition is small it will be much faster.)
+
+Fine, all this dd magic works great for me. It makes it so easy to backup and restore from whatever system whatever hard drive.
+Loop devices
+
+Virtual system image creation works great too.
+
+To create a new, empty media-image (30 GB), one can do: dd if=/dev/zero of=/my-media-image bs=1k count=30240000
+
+Then, to assign the media to a loopback device: losetup /dev/loop0 /my-media-image
+
+To create a filesystem on the media-image, one does: sudo mkfs -t ext3 -L MYVIRTUALFS -M /media/MYVIRTUALFS -I 128 -m 0 -b 4096 -O sparse_super -T largefile4 /dev/loop0
+
+The media can then be mounted: sudo mkdir /media/MYVIRTUALFS && mount /dev/loop0 /media/MYVIRTUALFS
+Problem
+
+What I don't understand is that, if I unmount the disk (sudo umount /media/MYVIRTUALFS), then delete the loopback device (sudo losetup -d /dev/loop0), I would have thought that the original media (/my-media-image) would be the exact same thing as a dd clone of /dev/loop0
+
+Apparently it's not, because if I do dd if=/my-media-image of=/dev/disk4 (beware, data loss on disk4), disk4 is corrupted, and unmountable.
+Why?
+
+It makes it possible to create a virtual filesystem from a Linux macine, complete with partition table, data, etc... then just copy the media-image (/my-media-image in my example) to another system (Macintosh in my case), where it's ready to deploy to real hard drives. It should even work on Windows, which has GUIs for dd.
+
+What am I missing?
+linux hard-drive partitioning dd disk-image
+share|improve this question
+	
+edited Jan 14 '14 at 13:02
+Chenmunka
+2,11851025
+	
+asked Mar 27 '13 at 20:10
+MichaelC
+3616
+	
+   	 
+	
+Well, one red flag I see is that you're creating (in the loop devices section) a filesystem on the raw device/file, instead of creating a partition table and then putting the filesystem on the partitions of device/file. So, writing the image to a disk would mean that the whole disk is ext3 instead of having a partition table with an ext3 partition on it. I don't recall how to address the "partitions" of a loopback device. –  killermist Mar 28 '13 at 0:56
+   	 
+	
+Of course ! I have forgotten the parted --script /dev/diskX mktable msdos mkpart primary 0% 100% that I do usually. Let me try it out. Your comment might be my answer. –  MichaelC Mar 28 '13 at 5:40
+   	 
+	
+All right, kollermist, you were correct, your comment is my answer. If running parted before makefs, everything works as expected, /my-media-image can be restored to a real disk. So... how shall we do ? Can I accept your comment as the answer ? I could edit the question( great editing by the way tapped-out, thanks), but then the question would contain the answer –  MichaelC Mar 28 '13 at 7:54
+   	 
+	
+Well, I figured out why it was failing, but in doing some more research, I'm not sure how to fix it. Some of the solutions I'm finding are quite dated, not maintained, and thus no longer functional (like one is for a Linux 2.4.20 and 2.4.21 prepatch 4 kernel if I'm reading right) unix.com/filesystems-disks-memory/… wiki.edseek.com/guide:mount_loopback –  killermist Mar 28 '13 at 14:20
+add a comment
+1 Answer
+active oldest votes
+up vote 2 down vote
+	
+
+As killermist mentioned, the error was that I had forgotten to create partitions before creating a filesystem. The instructions in the question are correct and create perfectly valid disk images, all one has to do is to create partitions, just after mounting the loop device, and just before creating a filesystem on it.
+So the correct sequence is
+losetup....
+parted --script /dev/loop0 mktable msdos mkpart primary 2048s 100%
+sudo mkfs...
